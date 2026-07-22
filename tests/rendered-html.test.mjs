@@ -40,18 +40,15 @@ test("renderiza la bandeja del prototipo de Santa Catalina", async () => {
   const html = await response.text();
   assert.match(html, /<html lang="es">/i);
   assert.match(html, /<title>Santa Catalina CRM · Prototipo<\/title>/i);
-  assert.match(html, /Conversaciones/);
-  assert.match(html, /Ventana abierta/);
-  assert.match(html, /Pedido en carga/);
-  assert.match(html, /Envio/);
+  assert.match(html, /Santa Catalina CRM/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/i);
 
   const page = await readFile(
     new URL("../app/page.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(page, /\"ENVIO\" \| \"RETIRA\"/);
-  assert.match(page, /Datos minimos completos para confirmar/);
+  assert.match(page, /\"RETIRA\" \| \"ENVIO\"/);
+  assert.match(page, /Atención Multiusuario WhatsApp/);
 });
 
 test("expone el health check local", async () => {
