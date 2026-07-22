@@ -33,6 +33,13 @@ type Message = {
   sentByUser?: { name: string } | null;
 };
 
+type InternalNote = {
+  id: string;
+  body: string;
+  createdAt: string;
+  authorUser?: { name: string; email: string } | null;
+};
+
 type Conversation = {
   id: string;
   status: string;
@@ -41,6 +48,7 @@ type Conversation = {
   serviceWindowExpiresAt?: string | null;
   customer: Customer;
   assignedUser?: { name: string } | null;
+  assignedUserId?: string | null;
   messages?: Message[];
 };
 
@@ -126,6 +134,9 @@ export default function SantaCatalinaCRM() {
     "CATALOG" | "QUICK_REPLIES" | "OPERATORS"
   >("CATALOG");
 
+  // Chat Mode: MESSAGES (WhatsApp) | NOTES (Private Internal Notes)
+  const [chatMode, setChatMode] = useState<"MESSAGES" | "NOTES">("MESSAGES");
+
   // Auth State
   const [loginEmail, setLoginEmail] = useState("admin@santacatalina.local");
   const [loginPassword, setLoginPassword] = useState("Admin123!");
@@ -138,7 +149,10 @@ export default function SantaCatalinaCRM() {
     string | null
   >(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [internalNotes, setInternalNotes] = useState<InternalNote[]>([]);
   const [newMessageText, setNewMessageText] = useState("");
+  const [newNoteText, setNewNoteText] = useState("");
+  const [assignUserId, setAssignUserId] = useState<string>("");
 
   // Orders State
   const [orders, setOrders] = useState<Order[]>([]);
@@ -156,7 +170,7 @@ export default function SantaCatalinaCRM() {
   const [orderNotes, setOrderNotes] = useState("");
   const [orderStatusMsg, setOrderStatusMsg] = useState<string | null>(null);
 
-  // Admin Form States: Category, Product, Quick Reply, Operator
+  // Admin Form States
   const [newCatName, setNewCatName] = useState("");
   const [newCatDesc, setNewCatDesc] = useState("");
   const [catStatusMsg, setCatStatusMsg] = useState<string | null>(null);
@@ -192,13 +206,20 @@ export default function SantaCatalinaCRM() {
   const selectConversation = useCallback(async (id: string) => {
     setSelectedConversationId(id);
     try {
-      const res = await fetch(`/api/conversations/${id}/messages`);
-      if (res.ok) {
-        const data = await res.json();
+      // 1. Cargar mensajes de WhatsApp
+      const resMsg = await fetch(`/api/conversations/${id}/messages`);
+      if (resMsg.ok) {
+        const data = await resMsg.json();
         setMessages(data.messages || []);
       }
+      // 2. Cargar notas internas
+      const resNotes = await fetch(`/api/conversations/${id}/notes`);
+      if (resNotes.ok) {
+        const dataNotes = await resNotes.json();
+        setInternalNotes(dataNotes.notes || []);
+      }
     } catch (err) {
-      console.error("Error cargando mensajes:", err);
+      console.error("Error cargando conversación:", err);
     }
   }, []);
 
@@ -277,6 +298,9 @@ export default function SantaCatalinaCRM() {
       if (res.ok) {
         const data = await res.json();
         setOperatorUsers(data.users || []);
+        if (data.users?.length > 0) {
+          setAssignUserId(data.users[0].id);
+        }
       }
     } catch (err) {
       console.error("Error cargando operadores:", err);
@@ -423,6 +447,55 @@ export default function SantaCatalinaCRM() {
     }
   }
 
+  async function handleAddInternalNote(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedConversationId || !newNoteText.trim()) return;
+
+    const textToSend = newNoteText.trim();
+    setNewNoteText("");
+
+    try {
+      const res = await fetch(
+        `/api/conversations/${selectedConversationId}/notes`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body: textToSend }),
+        },
+      );
+
+      if (res.ok) {
+        selectConversation(selectedConversationId);
+        fetchAuditLogs();
+      }
+    } catch (err) {
+      console.error("Error guardando nota interna:", err);
+    }
+  }
+
+  async function handleAssignConversation(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedConversationId || !assignUserId) return;
+
+    try {
+      const res = await fetch(
+        `/api/conversations/${selectedConversationId}/assign`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ assignedUserId: assignUserId }),
+        },
+      );
+
+      if (res.ok) {
+        fetchConversations();
+        fetchAuditLogs();
+      }
+    } catch (err) {
+      console.error("Error reasignando conversación:", err);
+    }
+  }
+
   async function handleCreateOrder(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedConversationId || !selectedProductId) return;
@@ -491,7 +564,7 @@ export default function SantaCatalinaCRM() {
     }
   }
 
-  // Admin Actions: Categories, Products, Quick Replies, Operators
+  // Admin Actions
   async function handleCreateCategory(e: React.FormEvent) {
     e.preventDefault();
     setCatStatusMsg(null);
@@ -927,11 +1000,40 @@ export default function SantaCatalinaCRM() {
                           selectedConversation.customer.whatsappNumber}
                       </h2>
                       <p className="text-xs text-slate-400">
-                        WhatsApp: {selectedConversation.customer.whatsappNumber}
+                        WhatsApp: {selectedConversation.customer.whatsappNumber}{" "}
+                        | Asignado a:{" "}
+                        <span className="text-amber-400 font-semibold">
+                          {selectedConversation.assignedUser?.name ||
+                            "Sin Asignar"}
+                        </span>
                       </p>
                     </div>
 
                     <div className="flex items-center space-x-3">
+                      {/* Operator Assign Dropdown Form */}
+                      <form
+                        onSubmit={handleAssignConversation}
+                        className="flex items-center space-x-2"
+                      >
+                        <select
+                          value={assignUserId}
+                          onChange={(e) => setAssignUserId(e.target.value)}
+                          className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-white"
+                        >
+                          {operatorUsers.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              👤 {u.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="submit"
+                          className="rounded-xl bg-slate-800 px-3 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-700"
+                        >
+                          Reasignar
+                        </button>
+                      </form>
+
                       <button
                         onClick={() => setShowOrderModal(true)}
                         className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-amber-400 shadow-md shadow-amber-500/10"
@@ -941,94 +1043,183 @@ export default function SantaCatalinaCRM() {
                     </div>
                   </div>
 
-                  {/* Messages List */}
-                  <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                    {messages.length === 0 ? (
-                      <div className="text-center text-xs text-slate-500">
-                        Sin mensajes anteriores en esta conversación.
-                      </div>
-                    ) : (
-                      messages.map((msg) => (
-                        <div
-                          key={msg.id}
-                          className={`flex ${msg.direction === "OUTBOUND" ? "justify-end" : "justify-start"}`}
-                        >
+                  {/* Mode Switcher Tabs: MESSAGES vs NOTES */}
+                  <div className="flex border-b border-slate-800 bg-slate-900/40 px-6 py-2 space-x-2">
+                    <button
+                      onClick={() => setChatMode("MESSAGES")}
+                      className={`rounded-lg px-4 py-1.5 text-xs font-bold transition ${
+                        chatMode === "MESSAGES"
+                          ? "bg-amber-500 text-slate-950"
+                          : "bg-slate-800 text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      💬 Mensajes WhatsApp ({messages.length})
+                    </button>
+                    <button
+                      onClick={() => setChatMode("NOTES")}
+                      className={`rounded-lg px-4 py-1.5 text-xs font-bold transition ${
+                        chatMode === "NOTES"
+                          ? "bg-amber-500 text-slate-950"
+                          : "bg-slate-800 text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      🔒 Notas Internas ({internalNotes.length})
+                    </button>
+                  </div>
+
+                  {/* Mode 1: Messages List */}
+                  {chatMode === "MESSAGES" && (
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                      {messages.length === 0 ? (
+                        <div className="text-center text-xs text-slate-500">
+                          Sin mensajes anteriores en esta conversación.
+                        </div>
+                      ) : (
+                        messages.map((msg) => (
                           <div
-                            className={`max-w-md rounded-2xl px-4 py-3 text-sm shadow-md ${
-                              msg.direction === "OUTBOUND"
-                                ? "bg-amber-500 text-slate-950 rounded-br-none"
-                                : "bg-slate-800 text-white rounded-bl-none"
-                            }`}
+                            key={msg.id}
+                            className={`flex ${msg.direction === "OUTBOUND" ? "justify-end" : "justify-start"}`}
                           >
-                            <p>{msg.text || "(Mensaje Multimedia)"}</p>
                             <div
-                              className={`mt-1 flex items-center justify-end space-x-1 text-[10px] ${
+                              className={`max-w-md rounded-2xl px-4 py-3 text-sm shadow-md ${
                                 msg.direction === "OUTBOUND"
-                                  ? "text-slate-900/70"
-                                  : "text-slate-400"
+                                  ? "bg-amber-500 text-slate-950 rounded-br-none"
+                                  : "bg-slate-800 text-white rounded-bl-none"
                               }`}
                             >
-                              <span>
-                                {new Date(msg.createdAt).toLocaleTimeString(
-                                  [],
-                                  {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  },
+                              <p>{msg.text || "(Mensaje Multimedia)"}</p>
+                              <div
+                                className={`mt-1 flex items-center justify-end space-x-1 text-[10px] ${
+                                  msg.direction === "OUTBOUND"
+                                    ? "text-slate-900/70"
+                                    : "text-slate-400"
+                                }`}
+                              >
+                                <span>
+                                  {new Date(msg.createdAt).toLocaleTimeString(
+                                    [],
+                                    {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    },
+                                  )}
+                                </span>
+                                {msg.direction === "OUTBOUND" && (
+                                  <span>• {msg.status}</span>
                                 )}
-                              </span>
-                              {msg.direction === "OUTBOUND" && (
-                                <span>• {msg.status}</span>
-                              )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                        ))
+                      )}
+                    </div>
+                  )}
 
-                  {/* Quick Replies Picker & Input Area */}
-                  <div className="border-t border-slate-800 bg-slate-900/50 p-4 space-y-3">
-                    {/* Quick Replies Bar */}
-                    {quickReplies.length > 0 && (
-                      <div className="flex items-center space-x-2 overflow-x-auto pb-1">
-                        <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider whitespace-nowrap">
-                          ⚡ Respuestas Rápidas:
-                        </span>
-                        {quickReplies.map((qr) => (
-                          <button
-                            key={qr.id}
-                            type="button"
-                            onClick={() => setNewMessageText(qr.content)}
-                            title={qr.content}
-                            className="rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:bg-amber-500 hover:text-slate-950 transition whitespace-nowrap border border-slate-700"
-                          >
-                            {qr.shortcut} ({qr.title})
-                          </button>
-                        ))}
+                  {/* Mode 2: Internal Notes List */}
+                  {chatMode === "NOTES" && (
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-950">
+                      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-400">
+                        🔒 Las notas internas son privadas y visibles solo para
+                        el equipo de Santa Catalina. Nunca se enviarán por
+                        WhatsApp al cliente.
                       </div>
-                    )}
 
-                    <form
-                      onSubmit={handleSendMessage}
-                      className="flex space-x-3"
-                    >
-                      <input
-                        type="text"
-                        placeholder="Escribe una respuesta para WhatsApp o selecciona una plantilla arriba..."
-                        value={newMessageText}
-                        onChange={(e) => setNewMessageText(e.target.value)}
-                        className="flex-1 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
-                      />
-                      <button
-                        type="submit"
-                        disabled={!newMessageText.trim()}
-                        className="rounded-xl bg-amber-500 px-6 py-3 text-sm font-bold text-slate-950 hover:bg-amber-400 disabled:opacity-50"
+                      {internalNotes.length === 0 ? (
+                        <div className="text-center text-xs text-slate-500 py-8">
+                          Sin notas internas registradas en esta conversación.
+                        </div>
+                      ) : (
+                        internalNotes.map((note) => (
+                          <div
+                            key={note.id}
+                            className="rounded-2xl border border-amber-500/40 bg-slate-900 p-4 space-y-1 shadow-md"
+                          >
+                            <div className="flex items-center justify-between text-xs font-bold text-amber-400">
+                              <span>
+                                🔒 Nota Interna de{" "}
+                                {note.authorUser?.name || "Operador"}
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                {new Date(note.createdAt).toLocaleString(
+                                  "es-AR",
+                                )}
+                              </span>
+                            </div>
+                            <p className="text-sm text-slate-200 whitespace-pre-wrap">
+                              {note.body}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {/* Input Area Depending on Chat Mode */}
+                  {chatMode === "MESSAGES" ? (
+                    <div className="border-t border-slate-800 bg-slate-900/50 p-4 space-y-3">
+                      {/* Quick Replies Bar */}
+                      {quickReplies.length > 0 && (
+                        <div className="flex items-center space-x-2 overflow-x-auto pb-1">
+                          <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider whitespace-nowrap">
+                            ⚡ Respuestas Rápidas:
+                          </span>
+                          {quickReplies.map((qr) => (
+                            <button
+                              key={qr.id}
+                              type="button"
+                              onClick={() => setNewMessageText(qr.content)}
+                              title={qr.content}
+                              className="rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:bg-amber-500 hover:text-slate-950 transition whitespace-nowrap border border-slate-700"
+                            >
+                              {qr.shortcut} ({qr.title})
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      <form
+                        onSubmit={handleSendMessage}
+                        className="flex space-x-3"
                       >
-                        Enviar 🚀
-                      </button>
-                    </form>
-                  </div>
+                        <input
+                          type="text"
+                          placeholder="Escribe una respuesta para WhatsApp..."
+                          value={newMessageText}
+                          onChange={(e) => setNewMessageText(e.target.value)}
+                          className="flex-1 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+                        />
+                        <button
+                          type="submit"
+                          disabled={!newMessageText.trim()}
+                          className="rounded-xl bg-amber-500 px-6 py-3 text-sm font-bold text-slate-950 hover:bg-amber-400 disabled:opacity-50"
+                        >
+                          Enviar 🚀
+                        </button>
+                      </form>
+                    </div>
+                  ) : (
+                    <div className="border-t border-amber-500/30 bg-amber-500/5 p-4">
+                      <form
+                        onSubmit={handleAddInternalNote}
+                        className="flex space-x-3"
+                      >
+                        <input
+                          type="text"
+                          placeholder="Escribe una nota interna privada (ej: Cliente abonará en efectivo con $20.000)..."
+                          value={newNoteText}
+                          onChange={(e) => setNewNoteText(e.target.value)}
+                          className="flex-1 rounded-xl border border-amber-500/40 bg-slate-950 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+                        />
+                        <button
+                          type="submit"
+                          disabled={!newNoteText.trim()}
+                          className="rounded-xl bg-amber-500 px-6 py-3 text-sm font-bold text-slate-950 hover:bg-amber-400 disabled:opacity-50"
+                        >
+                          Guardar Nota 🔒
+                        </button>
+                      </form>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="flex h-full items-center justify-center text-slate-500 text-sm">

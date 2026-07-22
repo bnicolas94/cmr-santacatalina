@@ -51,48 +51,48 @@ test("creación y verificación de tokens de sesión", async () => {
 });
 
 test("loginUser exitoso para el usuario admin con credenciales correctas", async () => {
-    const result = await loginUser(
-      { email: "admin@santacatalina.local", password: "Admin123!" },
-      { ip: "127.0.0.1", userAgent: "TestRunner" },
-      prisma,
-    );
+  const result = await loginUser(
+    { email: "admin@santacatalina.local", password: "Admin123!" },
+    { ip: "127.0.0.1", userAgent: "TestRunner" },
+    prisma,
+  );
 
-    assert.ok(result.user);
-    assert.equal(result.user.email, "admin@santacatalina.local");
-    assert.ok(result.user.roles.includes("ADMINISTRADOR"));
-    assert.ok(result.token);
+  assert.ok(result.user);
+  assert.equal(result.user.email, "admin@santacatalina.local");
+  assert.ok(result.user.roles.includes("ADMINISTRADOR"));
+  assert.ok(result.token);
 
-    // Verificar actualización de lastLoginAt
-    const dbUser = await prisma.user.findUnique({
-      where: { email: "admin@santacatalina.local" },
-    });
-    assert.ok(dbUser?.lastLoginAt);
+  // Verificar actualización de lastLoginAt
+  const dbUser = await prisma.user.findUnique({
+    where: { email: "admin@santacatalina.local" },
+  });
+  assert.ok(dbUser?.lastLoginAt);
 
-    // Verificar auditoría auth:login
-    const audit = await prisma.auditLog.findFirst({
-      where: { action: "auth:login", actorUserId: dbUser.id },
-      orderBy: { createdAt: "desc" },
-    });
-    assert.ok(audit);
+  // Verificar auditoría auth:login
+  const audit = await prisma.auditLog.findFirst({
+    where: { action: "auth:login", actorUserId: dbUser.id },
+    orderBy: { createdAt: "desc" },
+  });
+  assert.ok(audit);
 });
 
 test("loginUser falla y audita contraseña incorrecta o usuario inactivo", async () => {
-    await assert.rejects(
-      async () => {
-        await loginUser(
-          { email: "admin@santacatalina.local", password: "ContraseñaErronea" },
-          { ip: "127.0.0.1" },
-          prisma,
-        );
-      },
-      (err) => err instanceof AuthError && err.statusCode === 401,
-    );
+  await assert.rejects(
+    async () => {
+      await loginUser(
+        { email: "admin@santacatalina.local", password: "ContraseñaErronea" },
+        { ip: "127.0.0.1" },
+        prisma,
+      );
+    },
+    (err) => err instanceof AuthError && err.statusCode === 401,
+  );
 
-    const audit = await prisma.auditLog.findFirst({
-      where: { action: "auth:login_failed" },
-      orderBy: { createdAt: "desc" },
-    });
-    assert.ok(audit);
+  const audit = await prisma.auditLog.findFirst({
+    where: { action: "auth:login_failed" },
+    orderBy: { createdAt: "desc" },
+  });
+  assert.ok(audit);
 });
 
 test("evaluación de permisos con hasPermission", () => {

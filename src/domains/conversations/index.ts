@@ -358,3 +358,18 @@ export async function addInternalNote(
 
   return note;
 }
+
+export async function listInternalNotes(
+  conversationId: string,
+  client: PrismaClient = defaultPrisma,
+) {
+  return client.internalNote.findMany({
+    where: { conversationId },
+    include: {
+      authorUser: {
+        select: { name: true, email: true },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+}
