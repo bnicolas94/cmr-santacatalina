@@ -44,6 +44,13 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    define: {
+      __dirname: '""',
+      __filename: '""',
+    },
+    ssr: {
+      external: ["@prisma/client"],
+    },
     server: isCodexSeatbeltSandbox
       ? { watch: { useFsEvents: false, usePolling: true } }
       : undefined,

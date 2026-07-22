@@ -1,5 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
+import { hashPassword } from "../src/domains/auth/password";
+
 const prisma = new PrismaClient();
 
 const ROLES = [
@@ -191,18 +193,20 @@ async function main() {
 
   if (!adminRole) throw new Error("Rol ADMINISTRADOR no encontrado");
 
+  const initialPasswordHash = await hashPassword("Admin123!");
+
   const adminUser = await prisma.user.upsert({
     where: { email: "admin@santacatalina.local" },
     update: {
       name: "Administrador Santa Catalina",
+      passwordHash: initialPasswordHash,
       active: true,
     },
     create: {
       organizationId: organization.id,
       name: "Administrador Santa Catalina",
       email: "admin@santacatalina.local",
-      // Hash de contraseña seguro de demostración local
-      passwordHash: "$2a$12$e7xV6jB3Lp9d8k1Y2Z3a4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0",
+      passwordHash: initialPasswordHash,
       active: true,
     },
   });
