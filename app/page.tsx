@@ -71,7 +71,9 @@ export default function SantaCatalinaCRM() {
 
   // App Data State
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [selectedConversationId, setSelectedConversationId] = useState<
+    string | null
+  >(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessageText, setNewMessageText] = useState("");
 
@@ -80,7 +82,9 @@ export default function SantaCatalinaCRM() {
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string>("");
   const [orderQuantity, setOrderQuantity] = useState(1);
-  const [fulfillmentType, setFulfillmentType] = useState<"RETIRA" | "ENVIO">("RETIRA");
+  const [fulfillmentType, setFulfillmentType] = useState<"RETIRA" | "ENVIO">(
+    "RETIRA",
+  );
   const [orderNotes, setOrderNotes] = useState("");
   const [orderStatusMsg, setOrderStatusMsg] = useState<string | null>(null);
 
@@ -223,11 +227,14 @@ export default function SantaCatalinaCRM() {
     setNewMessageText("");
 
     try {
-      const res = await fetch(`/api/conversations/${selectedConversationId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: textToSend }),
-      });
+      const res = await fetch(
+        `/api/conversations/${selectedConversationId}/messages`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: textToSend }),
+        },
+      );
 
       if (res.ok) {
         selectConversation(selectedConversationId);
@@ -242,7 +249,9 @@ export default function SantaCatalinaCRM() {
     e.preventDefault();
     if (!selectedConversationId || !selectedProductId) return;
 
-    const activeConv = conversations.find((c) => c.id === selectedConversationId);
+    const activeConv = conversations.find(
+      (c) => c.id === selectedConversationId,
+    );
     if (!activeConv) return;
 
     setOrderStatusMsg(null);
@@ -272,7 +281,9 @@ export default function SantaCatalinaCRM() {
       if (!res.ok) {
         setOrderStatusMsg(data.error || "Error al crear pedido.");
       } else {
-        setOrderStatusMsg("✅ Pedido creado exitosamente: " + data.order.orderNumber);
+        setOrderStatusMsg(
+          "✅ Pedido creado exitosamente: " + data.order.orderNumber,
+        );
         setTimeout(() => {
           setShowOrderModal(false);
           setOrderStatusMsg(null);
@@ -293,10 +304,13 @@ export default function SantaCatalinaCRM() {
     return conversations.filter((c) => {
       const matchesSearch =
         c.customer.whatsappNumber.includes(searchQuery) ||
-        (c.customer.displayName || "").toLowerCase().includes(searchQuery.toLowerCase());
+        (c.customer.displayName || "")
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase());
 
       const matchesStatus =
-        statusFilter === "TODAS" || c.status.toUpperCase() === statusFilter.toUpperCase();
+        statusFilter === "TODAS" ||
+        c.status.toUpperCase() === statusFilter.toUpperCase();
 
       return matchesSearch && matchesStatus;
     });
@@ -307,7 +321,9 @@ export default function SantaCatalinaCRM() {
       <div className="flex h-screen w-screen items-center justify-center bg-slate-950 text-white">
         <div className="text-center">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-amber-500 border-t-transparent"></div>
-          <p className="mt-4 text-sm font-medium text-slate-400">Cargando Santa Catalina CRM...</p>
+          <p className="mt-4 text-sm font-medium text-slate-400">
+            Cargando Santa Catalina CRM...
+          </p>
         </div>
       </div>
     );
@@ -322,8 +338,12 @@ export default function SantaCatalinaCRM() {
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500 text-2xl font-bold text-slate-950 shadow-lg shadow-amber-500/20">
               SC
             </div>
-            <h1 className="mt-4 text-2xl font-bold text-white">Santa Catalina CRM</h1>
-            <p className="mt-1 text-sm text-slate-400">Atención Multiusuario WhatsApp & Pedidos</p>
+            <h1 className="mt-4 text-2xl font-bold text-white">
+              Santa Catalina CRM
+            </h1>
+            <p className="mt-1 text-sm text-slate-400">
+              Atención Multiusuario WhatsApp & Pedidos
+            </p>
           </div>
 
           <form onSubmit={handleLogin} className="mt-8 space-y-4">
@@ -417,19 +437,29 @@ export default function SantaCatalinaCRM() {
             <div>
               <span className="text-xs text-slate-400">Ventas Hoy:</span>
               <p className="font-bold text-emerald-400">
-                ${metrics?.revenueToday ? metrics.revenueToday.toLocaleString("es-AR") : "0"}
+                $
+                {metrics?.revenueToday
+                  ? metrics.revenueToday.toLocaleString("es-AR")
+                  : "0"}
               </p>
             </div>
             <div>
               <span className="text-xs text-slate-400">Pedidos Hoy:</span>
-              <p className="font-bold text-white">{metrics?.ordersTodayCount ?? 0}</p>
+              <p className="font-bold text-white">
+                {metrics?.ordersTodayCount ?? 0}
+              </p>
             </div>
             <div>
               <span className="text-xs text-slate-400">Activos:</span>
-              <p className="font-bold text-amber-400">{metrics?.activeConversations ?? 0}</p>
+              <p className="font-bold text-amber-400">
+                {metrics?.activeConversations ?? 0}
+              </p>
             </div>
             <div className="border-l border-slate-800 pl-6 text-xs text-slate-400">
-              Operador: <span className="font-semibold text-white">{currentUser.name}</span>
+              Operador:{" "}
+              <span className="font-semibold text-white">
+                {currentUser.name}
+              </span>
             </div>
           </div>
         </header>
@@ -475,12 +505,15 @@ export default function SantaCatalinaCRM() {
                     key={conv.id}
                     onClick={() => selectConversation(conv.id)}
                     className={`w-full p-4 text-left transition hover:bg-slate-800/50 ${
-                      selectedConversationId === conv.id ? "bg-slate-800/80 border-l-4 border-amber-500" : ""
+                      selectedConversationId === conv.id
+                        ? "bg-slate-800/80 border-l-4 border-amber-500"
+                        : ""
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-white text-sm">
-                        {conv.customer.displayName || conv.customer.whatsappNumber}
+                        {conv.customer.displayName ||
+                          conv.customer.whatsappNumber}
                       </span>
                       {conv.unreadCount > 0 && (
                         <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-extrabold text-slate-950">
@@ -496,7 +529,9 @@ export default function SantaCatalinaCRM() {
                         {conv.status}
                       </span>
                       <span className="text-slate-500">
-                        {conv.assignedUser ? `👤 ${conv.assignedUser.name}` : "Sin Asignar"}
+                        {conv.assignedUser
+                          ? `👤 ${conv.assignedUser.name}`
+                          : "Sin Asignar"}
                       </span>
                     </div>
                   </button>
@@ -513,7 +548,8 @@ export default function SantaCatalinaCRM() {
                 <div className="flex h-16 items-center justify-between border-b border-slate-800 bg-slate-900/30 px-6">
                   <div>
                     <h2 className="text-base font-bold text-white">
-                      {selectedConversation.customer.displayName || selectedConversation.customer.whatsappNumber}
+                      {selectedConversation.customer.displayName ||
+                        selectedConversation.customer.whatsappNumber}
                     </h2>
                     <p className="text-xs text-slate-400">
                       WhatsApp: {selectedConversation.customer.whatsappNumber}
@@ -552,7 +588,9 @@ export default function SantaCatalinaCRM() {
                           <p>{msg.text || "(Mensaje Multimedia)"}</p>
                           <div
                             className={`mt-1 flex items-center justify-end space-x-1 text-[10px] ${
-                              msg.direction === "OUTBOUND" ? "text-slate-900/70" : "text-slate-400"
+                              msg.direction === "OUTBOUND"
+                                ? "text-slate-900/70"
+                                : "text-slate-400"
                             }`}
                           >
                             <span>
@@ -561,7 +599,9 @@ export default function SantaCatalinaCRM() {
                                 minute: "2-digit",
                               })}
                             </span>
-                            {msg.direction === "OUTBOUND" && <span>• {msg.status}</span>}
+                            {msg.direction === "OUTBOUND" && (
+                              <span>• {msg.status}</span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -604,7 +644,9 @@ export default function SantaCatalinaCRM() {
           <div className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
             <h3 className="text-lg font-bold text-white">Tomar Nuevo Pedido</h3>
             <p className="mt-1 text-xs text-slate-400">
-              Cliente: {selectedConversation?.customer.displayName || selectedConversation?.customer.whatsappNumber}
+              Cliente:{" "}
+              {selectedConversation?.customer.displayName ||
+                selectedConversation?.customer.whatsappNumber}
             </p>
 
             {orderStatusMsg && (
@@ -613,9 +655,14 @@ export default function SantaCatalinaCRM() {
               </div>
             )}
 
-            <form onSubmit={handleCreateOrder} className="mt-4 space-y-4 text-xs">
+            <form
+              onSubmit={handleCreateOrder}
+              className="mt-4 space-y-4 text-xs"
+            >
               <div>
-                <label className="block font-semibold text-slate-400">Modalidad de Entrega</label>
+                <label className="block font-semibold text-slate-400">
+                  Modalidad de Entrega
+                </label>
                 <div className="mt-1 flex space-x-2">
                   {(["RETIRA", "ENVIO"] as const).map((m) => (
                     <button
@@ -628,14 +675,18 @@ export default function SantaCatalinaCRM() {
                           : "bg-slate-800 text-slate-400"
                       }`}
                     >
-                      {m === "RETIRA" ? "🏃 Retira por Sede" : "🛵 Envío a Domicilio"}
+                      {m === "RETIRA"
+                        ? "🏃 Retira por Sede"
+                        : "🛵 Envío a Domicilio"}
                     </button>
                   ))}
                 </div>
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-400">Producto del Menú</label>
+                <label className="block font-semibold text-slate-400">
+                  Producto del Menú
+                </label>
                 <select
                   value={selectedProductId}
                   onChange={(e) => setSelectedProductId(e.target.value)}
@@ -643,25 +694,32 @@ export default function SantaCatalinaCRM() {
                 >
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} - ${Number(p.price).toLocaleString("es-AR")} ({p.unit})
+                      {p.name} - ${Number(p.price).toLocaleString("es-AR")} (
+                      {p.unit})
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-400">Cantidad</label>
+                <label className="block font-semibold text-slate-400">
+                  Cantidad
+                </label>
                 <input
                   type="number"
                   min={1}
                   value={orderQuantity}
-                  onChange={(e) => setOrderQuantity(parseInt(e.target.value, 10) || 1)}
+                  onChange={(e) =>
+                    setOrderQuantity(parseInt(e.target.value, 10) || 1)
+                  }
                   className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-white"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-400">Notas / Aclaraciones</label>
+                <label className="block font-semibold text-slate-400">
+                  Notas / Aclaraciones
+                </label>
                 <input
                   type="text"
                   placeholder="Ej: Sin cebolla, abonará en efectivo con $10.000"

@@ -1,3 +1,4 @@
+import path from "node:path";
 import vinext from "vinext";
 import { defineConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json";
@@ -48,8 +49,17 @@ export default defineConfig(async () => {
       __dirname: '""',
       __filename: '""',
     },
+    resolve: {
+      alias: {
+        "pg-native": path.resolve("./scripts/pg-native-stub.js"),
+      },
+    },
+    optimizeDeps: {
+      exclude: ["@prisma/client", "pg-native"],
+    },
     ssr: {
-      external: ["@prisma/client"],
+      noExternal: ["@prisma/adapter-pg", "pg"],
+      external: ["@prisma/client", "pg-native"],
     },
     server: isCodexSeatbeltSandbox
       ? { watch: { useFsEvents: false, usePolling: true } }

@@ -8,6 +8,8 @@ import {
   processWebhookStatusUpdate,
 } from "../../../../src/domains/conversations/index.ts";
 
+import { getHeaderValue } from "../../../../src/domains/auth/session.ts";
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const hubMode = url.searchParams.get("hub.mode");
@@ -36,7 +38,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const rawBody = await request.text();
-    const signatureHeader = request.headers.get("x-hub-signature-256");
+    const signatureHeader = getHeaderValue(request, "x-hub-signature-256");
 
     const isValidSignature = validateWebhookSignature(rawBody, signatureHeader);
     if (!isValidSignature) {

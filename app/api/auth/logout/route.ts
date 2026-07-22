@@ -3,11 +3,12 @@ import {
   extractTokenFromRequest,
   buildClearSessionCookieHeader,
 } from "../../../../src/domains/auth/index.ts";
+import { getHeaderValue } from "../../../../src/domains/auth/session.ts";
 
 export async function POST(request: Request) {
   const token = extractTokenFromRequest(request);
-  const ip = request.headers.get("x-forwarded-for") || null;
-  const userAgent = request.headers.get("user-agent") || null;
+  const ip = getHeaderValue(request, "x-forwarded-for");
+  const userAgent = getHeaderValue(request, "user-agent");
 
   if (token) {
     await logoutUser(token, { ip, userAgent });

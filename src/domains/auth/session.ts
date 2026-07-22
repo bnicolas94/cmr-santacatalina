@@ -79,15 +79,26 @@ export async function verifySession(token: string): Promise<AuthUser | null> {
   }
 }
 
+export function getHeaderValue(req: Request, name: string): string | null {
+  const headers = req?.headers;
+  if (!headers) return null;
+  if (typeof headers.get === "function") {
+    return headers.get(name) || headers.get(name.toLowerCase());
+  }
+  const record = headers as unknown as Record<string, string | string[]>;
+  const val = record[name] || record[name.toLowerCase()];
+  return Array.isArray(val) ? val[0] : val || null;
+}
+
 export function extractTokenFromRequest(req: Request): string | null {
   // 1. Authorization header Bearer token
-  const authHeader = req.headers.get("authorization");
+  const authHeader = getHeaderValue(req, "authorization");
   if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
     return authHeader.slice(7).trim();
   }
 
   // 2. Cookie sc_session
-  const cookieHeader = req.headers.get("cookie");
+  const cookieHeader = getHeaderValue(req, "cookie");
   if (cookieHeader) {
     const cookies = cookieHeader.split(";").map((c) => c.trim());
     for (const cookie of cookies) {

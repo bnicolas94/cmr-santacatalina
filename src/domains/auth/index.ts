@@ -7,6 +7,7 @@ import {
   extractTokenFromRequest,
   type AuthUser,
 } from "./session.ts";
+import { db as defaultPrisma } from "../../infrastructure/db.ts";
 
 export { hashPassword, verifyPassword } from "./password.ts";
 export {
@@ -17,8 +18,6 @@ export {
   buildClearSessionCookieHeader,
   type AuthUser,
 } from "./session.ts";
-
-const defaultPrisma = new PrismaClient();
 
 export class AuthError extends Error {
   statusCode: number;
