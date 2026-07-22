@@ -132,3 +132,21 @@ model AuditLog {
   @@index([entityType, entityId])
   @@map("audit_logs")
 }
+
+model WebhookEvent {
+  id               String    @id @default(cuid())
+  provider         String    @default("whatsapp")
+  externalEventKey String?   @map("external_event_key")
+  eventType        String    @map("event_type")
+  payload          Json
+  status           String    @default("PENDING")
+  attempts         Int       @default(0)
+  processedAt      DateTime? @map("processed_at")
+  error            String?
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  @@index([provider, externalEventKey])
+  @@index([status])
+  @@index([createdAt])
+  @@map("webhook_events")
+}
