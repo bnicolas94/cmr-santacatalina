@@ -15,9 +15,11 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  branches  Branch[]
-  users     User[]
-  auditLogs AuditLog[]
+  branches      Branch[]
+  users         User[]
+  auditLogs     AuditLog[]
+  customers     Customer[]
+  conversations Conversation[]
 
   @@map("organizations")
 }
@@ -31,6 +33,8 @@ model Branch {
   active         Boolean      @default(true)
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  conversations Conversation[]
 
   @@index([organizationId])
   @@index([organizationId, active])
@@ -49,8 +53,12 @@ model User {
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
 
-  userRoles UserRole[]
-  auditLogs AuditLog[]
+  userRoles             UserRole[]
+  auditLogs             AuditLog[]
+  assignedConversations Conversation[] @relation("AssignedUser")
+  lockedConversations   Conversation[] @relation("LockUser")
+  sentMessages          Message[]
+  internalNotes         InternalNote[]
 
   @@index([organizationId])
   @@index([organizationId, active])
@@ -149,4 +157,134 @@ model WebhookEvent {
   @@index([status])
   @@index([createdAt])
   @@map("webhook_events")
+}
+
+model Customer {
+  id             String       @id @default(cuid())
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  whatsappNumber String       @map("whatsapp_number")
+  whatsappName   String?      @map("whatsapp_name")
+  displayName    String?      @map("display_name")
+  email          String?
+  document       String?
+  notes          String?
+  blocked        Boolean      @default(false)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  addresses     CustomerAddress[]
+  conversations Conversation[]
+
+  @@unique([organizationId, whatsappNumber])
+  @@index([organizationId])
+  @@index([whatsappNumber])
+  @@map("customers")
+}
+
+model CustomerAddress {
+  id         String   @id @default(cuid())
+  customerId String   @map("customer_id")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  label      String?
+  street     String
+  number     String
+  floor      String?
+  apartment  String?
+  city       String
+  province   String
+  postalCode String?  @map("postal_code")
+  reference  String?
+  isDefault  Boolean  @default(false) @map("is_default")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([customerId])
+  @@map("customer_addresses")
+}
+
+model Conversation {
+  id                     String       @id @default(cuid())
+  organizationId         String       @map("organization_id")
+  organization           Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customerId             String       @map("customer_id")
+  customer               Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  branchId               String?      @map("branch_id")
+  branch                 Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  status                 String       @default("NUEVA")
+  priority               String       @default("NORMAL")
+  assignedUserId         String?      @map("assigned_user_id")
+  assignedUser           User?        @relation("AssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  lockUserId             String?      @map("lock_user_id")
+  lockUser               User?        @relation("LockUser", fields: [lockUserId], references: [id], onDelete: SetNull)
+  lockExpiresAt          DateTime?    @map("lock_expires_at")
+  lastMessageAt          DateTime?    @map("last_message_at")
+  lastCustomerMessageAt  DateTime?    @map("last_customer_message_at")
+  serviceWindowExpiresAt DateTime?    @map("service_window_expires_at")
+  unreadCount            Int          @default(0) @map("unread_count")
+  closedAt               DateTime?    @map("closed_at")
+  createdAt              DateTime     @default(now()) @map("created_at")
+  updatedAt              DateTime     @updatedAt @map("updated_at")
+
+  messages      Message[]
+  internalNotes InternalNote[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([customerId])
+  @@index([assignedUserId])
+  @@map("conversations")
+}
+
+model Message {
+  id                String       @id @default(cuid())
+  conversationId    String       @map("conversation_id")
+  conversation      Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  externalMessageId String?      @map("external_message_id")
+  direction         String
+  type              String       @default("text")
+  text              String?
+  sentByUserId      String?      @map("sent_by_user_id")
+  sentByUser        User?        @relation(fields: [sentByUserId], references: [id], onDelete: SetNull)
+  externalTimestamp DateTime?    @map("external_timestamp")
+  status            String       @default("RECIBIDO")
+  errorCode         String?      @map("error_code")
+  errorMessage      String?      @map("error_message")
+  createdAt         DateTime     @default(now()) @map("created_at")
+
+  media Media[]
+
+  @@index([conversationId])
+  @@index([externalMessageId])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+model Media {
+  id              String    @id @default(cuid())
+  messageId       String    @map("message_id")
+  message         Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  externalMediaId String?   @map("external_media_id")
+  mimeType        String    @map("mime_type")
+  filename        String?
+  size            Int?
+  storageKey      String?   @map("storage_key")
+  downloadStatus  String    @default("PENDING") @map("download_status")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@index([messageId])
+  @@map("media")
+}
+
+model InternalNote {
+  id             String       @id @default(cuid())
+  conversationId String       @map("conversation_id")
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  authorUserId   String       @map("author_user_id")
+  authorUser     User         @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+  body           String
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@index([conversationId])
+  @@map("internal_notes")
 }

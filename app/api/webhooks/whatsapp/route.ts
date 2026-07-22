@@ -3,6 +3,10 @@ import {
   validateWebhookSignature,
   persistWebhookEvent,
 } from "../../../../src/domains/whatsapp/index.ts";
+import {
+  processInboundWebhookMessage,
+  processWebhookStatusUpdate,
+} from "../../../../src/domains/conversations/index.ts";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -53,6 +57,16 @@ export async function POST(request: Request) {
     }
 
     const { event, isDuplicate } = await persistWebhookEvent(payload);
+
+    if (!isDuplicate) {
+      // Procesar mensaje entrante o actualización de estado en segundo plano
+      Promise.all([
+        processInboundWebhookMessage(payload),
+        processWebhookStatusUpdate(payload),
+      ]).catch((err) =>
+        console.error("Error procesando mensaje de webhook:", err),
+      );
+    }
 
     return Response.json({
       status: "ok",
