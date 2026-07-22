@@ -55,11 +55,22 @@ export default defineConfig(async () => {
       },
     },
     optimizeDeps: {
-      exclude: ["@prisma/client", "pg-native"],
+      exclude: [
+        "@prisma/client",
+        "@prisma/adapter-pg",
+        "pg",
+        "pg-pool",
+        "pg-native",
+      ],
     },
     ssr: {
-      noExternal: ["@prisma/adapter-pg", "pg"],
-      external: ["@prisma/client", "pg-native"],
+      external: [
+        "@prisma/client",
+        "@prisma/adapter-pg",
+        "pg",
+        "pg-pool",
+        "pg-native",
+      ],
     },
     server: isCodexSeatbeltSandbox
       ? { watch: { useFsEvents: false, usePolling: true } }
@@ -67,10 +78,14 @@ export default defineConfig(async () => {
     plugins: [
       vinext(),
       sites(),
-      cloudflare({
-        viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
-        config: localBindingConfig,
-      }),
+      ...(d1 || r2
+        ? [
+            cloudflare({
+              viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
+              config: localBindingConfig,
+            }),
+          ]
+        : []),
     ],
   };
 });
