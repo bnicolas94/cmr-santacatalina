@@ -44,11 +44,18 @@ type Conversation = {
   messages?: Message[];
 };
 
+type Category = {
+  id: string;
+  name: string;
+  description?: string | null;
+};
+
 type Product = {
   id: string;
   name: string;
   price: string;
   unit: string;
+  categoryId: string;
   category?: { name: string };
 };
 
@@ -82,6 +89,22 @@ type AuditLogEntry = {
   createdAt: string;
 };
 
+type QuickReply = {
+  id: string;
+  shortcut: string;
+  title: string;
+  content: string;
+  category?: string | null;
+};
+
+type OperatorUser = {
+  id: string;
+  name: string;
+  email: string;
+  active: boolean;
+  userRoles?: Array<{ role: { name: string } }>;
+};
+
 type Metrics = {
   totalCustomers: number;
   activeConversations: number;
@@ -93,10 +116,15 @@ export default function SantaCatalinaCRM() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loadingSession, setLoadingSession] = useState(true);
 
-  // Tab State: CHAT | ORDERS | REPORTS
-  const [activeTab, setActiveTab] = useState<"CHAT" | "ORDERS" | "REPORTS">(
-    "CHAT",
-  );
+  // Tab State: CHAT | ORDERS | REPORTS | ADMIN
+  const [activeTab, setActiveTab] = useState<
+    "CHAT" | "ORDERS" | "REPORTS" | "ADMIN"
+  >("CHAT");
+
+  // Admin Sub-Tab State: CATALOG | QUICK_REPLIES | OPERATORS
+  const [adminSubTab, setAdminSubTab] = useState<
+    "CATALOG" | "QUICK_REPLIES" | "OPERATORS"
+  >("CATALOG");
 
   // Auth State
   const [loginEmail, setLoginEmail] = useState("admin@santacatalina.local");
@@ -117,6 +145,7 @@ export default function SantaCatalinaCRM() {
   const [orderStatusFilter, setOrderStatusFilter] = useState("TODOS");
 
   // Catalog State
+  const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string>("");
@@ -126,6 +155,33 @@ export default function SantaCatalinaCRM() {
   );
   const [orderNotes, setOrderNotes] = useState("");
   const [orderStatusMsg, setOrderStatusMsg] = useState<string | null>(null);
+
+  // Admin Form States: Category, Product, Quick Reply, Operator
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatDesc, setNewCatDesc] = useState("");
+  const [catStatusMsg, setCatStatusMsg] = useState<string | null>(null);
+
+  const [newProdName, setNewProdName] = useState("");
+  const [newProdPrice, setNewProdPrice] = useState("");
+  const [newProdUnit, setNewProdUnit] = useState("docena");
+  const [newProdCatId, setNewProdCatId] = useState("");
+  const [prodStatusMsg, setProdStatusMsg] = useState<string | null>(null);
+
+  const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
+  const [qrShortcut, setQrShortcut] = useState("");
+  const [qrTitle, setQrTitle] = useState("");
+  const [qrContent, setQrContent] = useState("");
+  const [qrCategory, setQrCategory] = useState("General");
+  const [qrStatusMsg, setQrStatusMsg] = useState<string | null>(null);
+
+  const [operatorUsers, setOperatorUsers] = useState<OperatorUser[]>([]);
+  const [opName, setOpName] = useState("");
+  const [opEmail, setOpEmail] = useState("");
+  const [opPassword, setOpPassword] = useState("");
+  const [opRole, setOpRole] = useState<
+    "TELEFONISTA" | "SUPERVISOR" | "ADMINISTRADOR"
+  >("TELEFONISTA");
+  const [opStatusMsg, setOpStatusMsg] = useState<string | null>(null);
 
   // Dashboard Metrics & Audit State
   const [metrics, setMetrics] = useState<Metrics | null>(null);
@@ -161,6 +217,21 @@ export default function SantaCatalinaCRM() {
     }
   }, [selectedConversationId, selectConversation]);
 
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await fetch("/api/catalog/categories");
+      if (res.ok) {
+        const data = await res.json();
+        setCategories(data.categories || []);
+        if (data.categories?.length > 0 && !newProdCatId) {
+          setNewProdCatId(data.categories[0].id);
+        }
+      }
+    } catch (err) {
+      console.error("Error cargando categorías:", err);
+    }
+  }, [newProdCatId]);
+
   const fetchProducts = useCallback(async () => {
     try {
       const res = await fetch("/api/catalog/products");
@@ -185,6 +256,30 @@ export default function SantaCatalinaCRM() {
       }
     } catch (err) {
       console.error("Error cargando pedidos:", err);
+    }
+  }, []);
+
+  const fetchQuickReplies = useCallback(async () => {
+    try {
+      const res = await fetch("/api/quick-replies");
+      if (res.ok) {
+        const data = await res.json();
+        setQuickReplies(data.quickReplies || []);
+      }
+    } catch (err) {
+      console.error("Error cargando respuestas rápidas:", err);
+    }
+  }, []);
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const res = await fetch("/api/users");
+      if (res.ok) {
+        const data = await res.json();
+        setOperatorUsers(data.users || []);
+      }
+    } catch (err) {
+      console.error("Error cargando operadores:", err);
     }
   }, []);
 
@@ -214,14 +309,20 @@ export default function SantaCatalinaCRM() {
 
   const loadDashboardData = useCallback(() => {
     fetchConversations();
+    fetchCategories();
     fetchProducts();
     fetchOrders();
+    fetchQuickReplies();
+    fetchUsers();
     fetchMetrics();
     fetchAuditLogs();
   }, [
     fetchConversations,
+    fetchCategories,
     fetchProducts,
     fetchOrders,
+    fetchQuickReplies,
+    fetchUsers,
     fetchMetrics,
     fetchAuditLogs,
   ]);
@@ -238,8 +339,11 @@ export default function SantaCatalinaCRM() {
           if (isMounted) {
             setCurrentUser(data.user);
             fetchConversations();
+            fetchCategories();
             fetchProducts();
             fetchOrders();
+            fetchQuickReplies();
+            fetchUsers();
             fetchMetrics();
             fetchAuditLogs();
           }
@@ -384,6 +488,142 @@ export default function SantaCatalinaCRM() {
       }
     } catch (err) {
       console.error("Error actualizando pedido:", err);
+    }
+  }
+
+  // Admin Actions: Categories, Products, Quick Replies, Operators
+  async function handleCreateCategory(e: React.FormEvent) {
+    e.preventDefault();
+    setCatStatusMsg(null);
+
+    try {
+      const res = await fetch("/api/catalog/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newCatName, description: newCatDesc }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setCatStatusMsg(data.error || "Error creando categoría.");
+      } else {
+        setCatStatusMsg("✅ Categoría '" + data.category.name + "' creada.");
+        setNewCatName("");
+        setNewCatDesc("");
+        fetchCategories();
+        fetchAuditLogs();
+      }
+    } catch {
+      setCatStatusMsg("Error de conexión.");
+    }
+  }
+
+  async function handleCreateProduct(e: React.FormEvent) {
+    e.preventDefault();
+    setProdStatusMsg(null);
+
+    try {
+      const res = await fetch("/api/catalog/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newProdName,
+          price: parseFloat(newProdPrice) || 0,
+          unit: newProdUnit,
+          categoryId: newProdCatId,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setProdStatusMsg(data.error || "Error creando producto.");
+      } else {
+        setProdStatusMsg("✅ Producto '" + data.product.name + "' creado.");
+        setNewProdName("");
+        setNewProdPrice("");
+        fetchProducts();
+        fetchAuditLogs();
+      }
+    } catch {
+      setProdStatusMsg("Error de conexión.");
+    }
+  }
+
+  async function handleCreateQuickReply(e: React.FormEvent) {
+    e.preventDefault();
+    setQrStatusMsg(null);
+
+    try {
+      const res = await fetch("/api/quick-replies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shortcut: qrShortcut,
+          title: qrTitle,
+          content: qrContent,
+          category: qrCategory,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setQrStatusMsg(data.error || "Error al guardar plantilla.");
+      } else {
+        setQrStatusMsg(
+          "✅ Plantilla '" + data.quickReply.title + "' guardada.",
+        );
+        setQrShortcut("");
+        setQrTitle("");
+        setQrContent("");
+        fetchQuickReplies();
+        fetchAuditLogs();
+      }
+    } catch {
+      setQrStatusMsg("Error de conexión.");
+    }
+  }
+
+  async function handleDeleteQuickReply(id: string) {
+    try {
+      const res = await fetch(`/api/quick-replies/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        fetchQuickReplies();
+        fetchAuditLogs();
+      }
+    } catch (err) {
+      console.error("Error eliminando plantilla:", err);
+    }
+  }
+
+  async function handleCreateOperator(e: React.FormEvent) {
+    e.preventDefault();
+    setOpStatusMsg(null);
+
+    try {
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: opName,
+          email: opEmail,
+          password: opPassword,
+          roleName: opRole,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setOpStatusMsg(data.error || "Error al crear operador.");
+      } else {
+        setOpStatusMsg("✅ Operador '" + data.user.name + "' registrado.");
+        setOpName("");
+        setOpEmail("");
+        setOpPassword("");
+        fetchUsers();
+        fetchAuditLogs();
+      }
+    } catch {
+      setOpStatusMsg("Error de conexión.");
     }
   }
 
@@ -532,6 +772,17 @@ export default function SantaCatalinaCRM() {
             }`}
           >
             👥
+          </button>
+          <button
+            onClick={() => setActiveTab("ADMIN")}
+            title="Configuración & Panel de Administración"
+            className={`rounded-xl p-2.5 transition ${
+              activeTab === "ADMIN"
+                ? "bg-slate-800 text-amber-400"
+                : "text-slate-400 hover:bg-slate-800 hover:text-white"
+            }`}
+          >
+            ⚙️
           </button>
         </div>
 
@@ -736,15 +987,35 @@ export default function SantaCatalinaCRM() {
                     )}
                   </div>
 
-                  {/* Input Area */}
-                  <div className="border-t border-slate-800 bg-slate-900/50 p-4">
+                  {/* Quick Replies Picker & Input Area */}
+                  <div className="border-t border-slate-800 bg-slate-900/50 p-4 space-y-3">
+                    {/* Quick Replies Bar */}
+                    {quickReplies.length > 0 && (
+                      <div className="flex items-center space-x-2 overflow-x-auto pb-1">
+                        <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider whitespace-nowrap">
+                          ⚡ Respuestas Rápidas:
+                        </span>
+                        {quickReplies.map((qr) => (
+                          <button
+                            key={qr.id}
+                            type="button"
+                            onClick={() => setNewMessageText(qr.content)}
+                            title={qr.content}
+                            className="rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:bg-amber-500 hover:text-slate-950 transition whitespace-nowrap border border-slate-700"
+                          >
+                            {qr.shortcut} ({qr.title})
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     <form
                       onSubmit={handleSendMessage}
                       className="flex space-x-3"
                     >
                       <input
                         type="text"
-                        placeholder="Escribe una respuesta para WhatsApp..."
+                        placeholder="Escribe una respuesta para WhatsApp o selecciona una plantilla arriba..."
                         value={newMessageText}
                         onChange={(e) => setNewMessageText(e.target.value)}
                         className="flex-1 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
@@ -1076,6 +1347,439 @@ export default function SantaCatalinaCRM() {
                 </table>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* TAB 4: PANEL DE ADMINISTRACION & CONFIGURACION */}
+        {activeTab === "ADMIN" && (
+          <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-slate-950">
+            <div>
+              <h2 className="text-xl font-bold text-white">
+                ⚙️ Panel de Administración & Personalización
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Configurá de forma dinámica categorías, productos, precios,
+                plantillas de chat y operadores
+              </p>
+            </div>
+
+            {/* Admin Sub-Tab Selector */}
+            <div className="flex space-x-2 border-b border-slate-800 pb-4">
+              <button
+                onClick={() => setAdminSubTab("CATALOG")}
+                className={`rounded-xl px-4 py-2.5 text-xs font-bold transition ${
+                  adminSubTab === "CATALOG"
+                    ? "bg-amber-500 text-slate-950"
+                    : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+                }`}
+              >
+                🍕 Catálogo & Precios
+              </button>
+              <button
+                onClick={() => setAdminSubTab("QUICK_REPLIES")}
+                className={`rounded-xl px-4 py-2.5 text-xs font-bold transition ${
+                  adminSubTab === "QUICK_REPLIES"
+                    ? "bg-amber-500 text-slate-950"
+                    : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+                }`}
+              >
+                ⚡ Respuestas Rápidas (Plantillas)
+              </button>
+              <button
+                onClick={() => setAdminSubTab("OPERATORS")}
+                className={`rounded-xl px-4 py-2.5 text-xs font-bold transition ${
+                  adminSubTab === "OPERATORS"
+                    ? "bg-amber-500 text-slate-950"
+                    : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+                }`}
+              >
+                👥 Operadores & Usuarios
+              </button>
+            </div>
+
+            {/* SUB-TAB 1: CATALOGO & PRECIOS */}
+            {adminSubTab === "CATALOG" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Form Alta de Categoría */}
+                <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl space-y-4">
+                  <h3 className="text-base font-bold text-white">
+                    Alta de Nueva Categoría
+                  </h3>
+                  {catStatusMsg && (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-400">
+                      {catStatusMsg}
+                    </div>
+                  )}
+                  <form
+                    onSubmit={handleCreateCategory}
+                    className="space-y-4 text-xs"
+                  >
+                    <div>
+                      <label className="block font-semibold text-slate-400">
+                        Nombre de la Categoría
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ej: Postres, Promos Especiales, Minutas"
+                        value={newCatName}
+                        onChange={(e) => setNewCatName(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-400">
+                        Descripción (Opcional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej: Menú especial de postres artesanales"
+                        value={newCatDesc}
+                        onChange={(e) => setNewCatDesc(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-white"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full rounded-xl bg-amber-500 py-3 text-xs font-bold text-slate-950 hover:bg-amber-400"
+                    >
+                      Guardar Categoría 📁
+                    </button>
+                  </form>
+                </div>
+
+                {/* Form Alta de Producto */}
+                <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl space-y-4">
+                  <h3 className="text-base font-bold text-white">
+                    Alta de Nuevo Producto / Sabor
+                  </h3>
+                  {prodStatusMsg && (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-400">
+                      {prodStatusMsg}
+                    </div>
+                  )}
+                  <form
+                    onSubmit={handleCreateProduct}
+                    className="space-y-4 text-xs"
+                  >
+                    <div>
+                      <label className="block font-semibold text-slate-400">
+                        Categoría
+                      </label>
+                      <select
+                        value={newProdCatId}
+                        onChange={(e) => setNewProdCatId(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-white"
+                      >
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-400">
+                        Nombre del Producto / Sabor
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ej: Pizza Napolitana con Fainá"
+                        value={newProdName}
+                        onChange={(e) => setNewProdName(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-white"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block font-semibold text-slate-400">
+                          Precio ($ ARS)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.5"
+                          required
+                          placeholder="Ej: 14500"
+                          value={newProdPrice}
+                          onChange={(e) => setNewProdPrice(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-slate-400">
+                          Unidad de Medida
+                        </label>
+                        <select
+                          value={newProdUnit}
+                          onChange={(e) => setNewProdUnit(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-white"
+                        >
+                          <option value="unidad">unidad</option>
+                          <option value="docena">docena</option>
+                          <option value="medio docena">media docena</option>
+                          <option value="porcion">porción</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full rounded-xl bg-amber-500 py-3 text-xs font-bold text-slate-950 hover:bg-amber-400"
+                    >
+                      Guardar Producto en el Menú 🍕
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* SUB-TAB 2: RESPUESTAS RÁPIDAS (PLANTILLAS) */}
+            {adminSubTab === "QUICK_REPLIES" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Form Alta de Plantilla */}
+                <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl space-y-4">
+                  <h3 className="text-base font-bold text-white">
+                    Crear Nueva Respuesta Rápida
+                  </h3>
+                  {qrStatusMsg && (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-400">
+                      {qrStatusMsg}
+                    </div>
+                  )}
+                  <form
+                    onSubmit={handleCreateQuickReply}
+                    className="space-y-4 text-xs"
+                  >
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block font-semibold text-slate-400">
+                          Atajo (ej: /alias)
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="/alias"
+                          value={qrShortcut}
+                          onChange={(e) => setQrShortcut(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-slate-400">
+                          Título Identificador
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Datos de Pago CBU"
+                          value={qrTitle}
+                          onChange={(e) => setQrTitle(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-400">
+                        Mensaje Completo para WhatsApp
+                      </label>
+                      <textarea
+                        required
+                        rows={4}
+                        placeholder="Ej: CBU Mercado Pago: 00000031000... Alias: SANTA.CATALINA.PIZZA. Titular: Santa Catalina SRL"
+                        value={qrContent}
+                        onChange={(e) => setQrContent(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-400">
+                        Categoría
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="General, Pagos, Horarios"
+                        value={qrCategory}
+                        onChange={(e) => setQrCategory(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-white"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full rounded-xl bg-amber-500 py-3 text-xs font-bold text-slate-950 hover:bg-amber-400"
+                    >
+                      Guardar Respuesta Rápida ⚡
+                    </button>
+                  </form>
+                </div>
+
+                {/* Lista de Plantillas Guardadas */}
+                <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl space-y-4">
+                  <h3 className="text-base font-bold text-white">
+                    Plantillas Registradas
+                  </h3>
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                    {quickReplies.length === 0 ? (
+                      <p className="text-xs text-slate-500 text-center py-8">
+                        Sin respuestas rápidas configuradas.
+                      </p>
+                    ) : (
+                      quickReplies.map((qr) => (
+                        <div
+                          key={qr.id}
+                          className="rounded-xl border border-slate-800 bg-slate-950 p-4 space-y-2"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-amber-400 text-xs">
+                              {qr.shortcut} — {qr.title}
+                            </span>
+                            <button
+                              onClick={() => handleDeleteQuickReply(qr.id)}
+                              className="text-[10px] font-bold text-red-400 hover:text-red-300 bg-red-500/10 px-2 py-1 rounded-lg"
+                            >
+                              Eliminar 🗑️
+                            </button>
+                          </div>
+                          <p className="text-xs text-slate-300 whitespace-pre-wrap">
+                            {qr.content}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SUB-TAB 3: OPERADORES & USUARIOS */}
+            {adminSubTab === "OPERATORS" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Form Alta de Operador */}
+                <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl space-y-4">
+                  <h3 className="text-base font-bold text-white">
+                    Dar de Alta Nuevo Operador
+                  </h3>
+                  {opStatusMsg && (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-400">
+                      {opStatusMsg}
+                    </div>
+                  )}
+                  <form
+                    onSubmit={handleCreateOperator}
+                    className="space-y-4 text-xs"
+                  >
+                    <div>
+                      <label className="block font-semibold text-slate-400">
+                        Nombre Completo del Empleado
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ej: Mariana Gómez"
+                        value={opName}
+                        onChange={(e) => setOpName(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-400">
+                        Correo Electrónico
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="ejemplo@santacatalina.local"
+                        value={opEmail}
+                        onChange={(e) => setOpEmail(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-400">
+                        Contraseña de Acceso
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        placeholder="••••••••"
+                        value={opPassword}
+                        onChange={(e) => setOpPassword(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-400">
+                        Rol del Usuario
+                      </label>
+                      <select
+                        value={opRole}
+                        onChange={(e) =>
+                          setOpRole(
+                            e.target.value as
+                              | "TELEFONISTA"
+                              | "SUPERVISOR"
+                              | "ADMINISTRADOR",
+                          )
+                        }
+                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-white"
+                      >
+                        <option value="TELEFONISTA">
+                          TELEFONISTA (Atención y Toma de Pedidos)
+                        </option>
+                        <option value="SUPERVISOR">
+                          SUPERVISOR (Control de Atenciones)
+                        </option>
+                        <option value="ADMINISTRADOR">
+                          ADMINISTRADOR (Acceso Total)
+                        </option>
+                      </select>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full rounded-xl bg-amber-500 py-3 text-xs font-bold text-slate-950 hover:bg-amber-400"
+                    >
+                      Registrar Operador 👥
+                    </button>
+                  </form>
+                </div>
+
+                {/* Lista de Operadores */}
+                <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl space-y-4">
+                  <h3 className="text-base font-bold text-white">
+                    Personal Registrado
+                  </h3>
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {operatorUsers.map((u) => (
+                      <div
+                        key={u.id}
+                        className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950 p-4"
+                      >
+                        <div>
+                          <p className="font-bold text-white text-xs">
+                            {u.name}
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            {u.email}
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-slate-800 px-3 py-1 text-[10px] font-extrabold text-amber-400">
+                          {u.userRoles?.[0]?.role.name || "TELEFONISTA"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

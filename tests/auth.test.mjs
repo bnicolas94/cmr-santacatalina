@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PrismaClient } from "@prisma/client";
+import { db as prisma } from "../src/infrastructure/db.ts";
 import {
   hashPassword,
   verifyPassword,
@@ -51,8 +51,6 @@ test("creación y verificación de tokens de sesión", async () => {
 });
 
 test("loginUser exitoso para el usuario admin con credenciales correctas", async () => {
-  const prisma = new PrismaClient();
-  try {
     const result = await loginUser(
       { email: "admin@santacatalina.local", password: "Admin123!" },
       { ip: "127.0.0.1", userAgent: "TestRunner" },
@@ -76,14 +74,9 @@ test("loginUser exitoso para el usuario admin con credenciales correctas", async
       orderBy: { createdAt: "desc" },
     });
     assert.ok(audit);
-  } finally {
-    await prisma.$disconnect();
-  }
 });
 
 test("loginUser falla y audita contraseña incorrecta o usuario inactivo", async () => {
-  const prisma = new PrismaClient();
-  try {
     await assert.rejects(
       async () => {
         await loginUser(
@@ -100,9 +93,6 @@ test("loginUser falla y audita contraseña incorrecta o usuario inactivo", async
       orderBy: { createdAt: "desc" },
     });
     assert.ok(audit);
-  } finally {
-    await prisma.$disconnect();
-  }
 });
 
 test("evaluación de permisos con hasPermission", () => {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PrismaClient } from "@prisma/client";
+import { db as prisma } from "../src/infrastructure/db.ts";
 import {
   listCategories,
   createCategory,
@@ -15,88 +15,78 @@ import { GET as getCategoriesRoute } from "../app/api/catalog/categories/route.t
 import { GET as getProductsRoute } from "../app/api/catalog/products/route.ts";
 
 test("listCategories y listProducts consultan los datos sembrados", async () => {
-  const prisma = new PrismaClient();
-  try {
-    const org = await prisma.organization.findFirst();
-    assert.ok(org);
+  const org = await prisma.organization.findFirst();
+  assert.ok(org);
 
-    const categories = await listCategories(org.id, true, prisma);
-    assert.ok(categories.length >= 4);
+  const categories = await listCategories(org.id, true, prisma);
+  assert.ok(categories.length >= 4);
 
-    const products = await listProducts(org.id, {}, prisma);
-    assert.ok(products.length >= 6);
+  const products = await listProducts(org.id, {}, prisma);
+  assert.ok(products.length >= 6);
 
-    const empanadasCategory = categories.find((c) => c.name === "Empanadas");
-    assert.ok(empanadasCategory);
+  const empanadasCategory = categories.find((c) => c.name === "Empanadas");
+  assert.ok(empanadasCategory);
 
-    const empanadasProducts = await listProducts(
-      org.id,
-      { categoryId: empanadasCategory.id },
-      prisma,
-    );
-    assert.ok(empanadasProducts.length >= 2);
-  } finally {
-    await prisma.$disconnect();
-  }
+  const empanadasProducts = await listProducts(
+    org.id,
+    { categoryId: empanadasCategory.id },
+    prisma,
+  );
+  assert.ok(empanadasProducts.length >= 2);
 });
 
 test("createCategory, updateCategory, createProduct y updateProduct con precios Decimal", async () => {
-  const prisma = new PrismaClient();
-  try {
-    const org = await prisma.organization.findFirst();
-    const admin = await prisma.user.findFirst({
-      where: { organizationId: org.id },
-    });
+  const org = await prisma.organization.findFirst();
+  const admin = await prisma.user.findFirst({
+    where: { organizationId: org.id },
+  });
 
-    // 1. Categoría
-    const cat = await createCategory(
-      {
-        organizationId: org.id,
-        name: "Especiales de Estación",
-        sortOrder: 10,
-      },
-      admin.id,
-      prisma,
-    );
-    assert.ok(cat.id);
+  // 1. Categoría
+  const cat = await createCategory(
+    {
+      organizationId: org.id,
+      name: "Especiales de Estación",
+      sortOrder: 10,
+    },
+    admin.id,
+    prisma,
+  );
+  assert.ok(cat.id);
 
-    const updatedCat = await updateCategory(
-      cat.id,
-      { name: "Especiales de Invierno" },
-      admin.id,
-      prisma,
-    );
-    assert.equal(updatedCat.name, "Especiales de Invierno");
+  const updatedCat = await updateCategory(
+    cat.id,
+    { name: "Especiales de Invierno" },
+    admin.id,
+    prisma,
+  );
+  assert.equal(updatedCat.name, "Especiales de Invierno");
 
-    // 2. Producto con precio Decimal
-    const prod = await createProduct(
-      {
-        organizationId: org.id,
-        categoryId: cat.id,
-        name: "Guiso de Lentejas Especial",
-        price: 8500.5,
-        unit: "PORCION",
-      },
-      admin.id,
-      prisma,
-    );
-    assert.ok(prod.id);
-    assert.equal(prod.price.toString(), "8500.5");
+  // 2. Producto con precio Decimal
+  const prod = await createProduct(
+    {
+      organizationId: org.id,
+      categoryId: cat.id,
+      name: "Guiso de Lentejas Especial",
+      price: 8500.5,
+      unit: "PORCION",
+    },
+    admin.id,
+    prisma,
+  );
+  assert.ok(prod.id);
+  assert.equal(prod.price.toString(), "8500.5");
 
-    const updatedProd = await updateProduct(
-      prod.id,
-      { price: 8900.0 },
-      admin.id,
-      prisma,
-    );
-    assert.equal(updatedProd.price.toString(), "8900");
+  const updatedProd = await updateProduct(
+    prod.id,
+    { price: 8900.0 },
+    admin.id,
+    prisma,
+  );
+  assert.equal(updatedProd.price.toString(), "8900");
 
-    const fetched = await getProductById(prod.id, prisma);
-    assert.ok(fetched);
-    assert.equal(fetched.name, "Guiso de Lentejas Especial");
-  } finally {
-    await prisma.$disconnect();
-  }
+  const fetched = await getProductById(prod.id, prisma);
+  assert.ok(fetched);
+  assert.equal(fetched.name, "Guiso de Lentejas Especial");
 });
 
 test("rutas API /api/catalog/categories y /api/catalog/products", async () => {

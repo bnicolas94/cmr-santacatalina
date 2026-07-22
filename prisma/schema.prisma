@@ -1,6 +1,7 @@
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+  binaryTargets   = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -24,6 +25,7 @@ model Organization {
   categories    Category[]
   products      Product[]
   orders        Order[]
+  quickReplies  QuickReply[]
 
   @@map("organizations")
 }
@@ -411,3 +413,19 @@ model OrderStatusHistory {
   @@index([orderId])
   @@map("order_status_history")
 }
+
+model QuickReply {
+  id             String       @id @default(cuid())
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  shortcut       String
+  title          String
+  content        String
+  category       String?      @default("General")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@index([organizationId])
+  @@map("quick_replies")
+}
+

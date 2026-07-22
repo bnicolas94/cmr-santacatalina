@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHmac } from "node:crypto";
-import { PrismaClient } from "@prisma/client";
+import { db as prisma } from "../src/infrastructure/db.ts";
 import {
   verifyWebhookChallenge,
   validateWebhookSignature,
@@ -48,49 +48,44 @@ test("validateWebhookSignature verifica firmas HMAC SHA-256", () => {
 });
 
 test("persistWebhookEvent guarda eventos en bruto y aplica idempotencia por wamid", async () => {
-  const prisma = new PrismaClient();
-  try {
-    const wamid = `wamid.HBgLMTIzNDU2Nzg5MDFWAgASGBQzQTFFN0E3QjREOUY5RkU3RjE1AA_${Date.now()}`;
-    const payload = {
-      object: "whatsapp_business_account",
-      entry: [
-        {
-          id: "waba_123",
-          changes: [
-            {
-              field: "messages",
-              value: {
-                messaging_product: "whatsapp",
-                messages: [
-                  {
-                    id: wamid,
-                    from: "5491112345678",
-                    timestamp: "1721660000",
-                    text: { body: "Hola Santa Catalina!" },
-                    type: "text",
-                  },
-                ],
-              },
+  const wamid = `wamid.HBgLMTIzNDU2Nzg5MDFWAgASGBQzQTFFN0E3QjREOUY5RkU3RjE1AA_${Date.now()}`;
+  const payload = {
+    object: "whatsapp_business_account",
+    entry: [
+      {
+        id: "waba_123",
+        changes: [
+          {
+            field: "messages",
+            value: {
+              messaging_product: "whatsapp",
+              messages: [
+                {
+                  id: wamid,
+                  from: "5491112345678",
+                  timestamp: "1721660000",
+                  text: { body: "Hola Santa Catalina!" },
+                  type: "text",
+                },
+              ],
             },
-          ],
-        },
-      ],
-    };
+          },
+        ],
+      },
+    ],
+  };
 
-    // 1. Inserción inicial
-    const res1 = await persistWebhookEvent(payload, prisma);
-    assert.equal(res1.isDuplicate, false);
-    assert.ok(res1.event.id);
-    assert.equal(res1.event.externalEventKey, wamid);
-    assert.equal(res1.event.status, "PENDING");
+  // 1. Inserción inicial
+  const res1 = await persistWebhookEvent(payload, prisma);
+  assert.equal(res1.isDuplicate, false);
+  assert.ok(res1.event.id);
+  assert.equal(res1.event.externalEventKey, wamid);
+  assert.equal(res1.event.status, "PENDING");
 
-    // 2. Reintento con el mismo wamid (Idempotencia)
-    const res2 = await persistWebhookEvent(payload, prisma);
-    assert.equal(res2.isDuplicate, true);
-    assert.equal(res2.event.id, res1.event.id);
-  } finally {
-    await prisma.$disconnect();
-  }
+  // 2. Reintento con el mismo wamid (Idempotencia)
+  const res2 = await persistWebhookEvent(payload, prisma);
+  assert.equal(res2.isDuplicate, true);
+  assert.equal(res2.event.id, res1.event.id);
 });
 
 test("GET /api/webhooks/whatsapp responde con el desafío de verificación de Meta", async () => {

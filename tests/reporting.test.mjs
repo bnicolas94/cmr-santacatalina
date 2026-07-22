@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PrismaClient } from "@prisma/client";
+import { db as prisma } from "../src/infrastructure/db.ts";
 import {
   getDashboardMetrics,
   getAuditLogsReport,
@@ -10,22 +10,17 @@ import { GET as getMetricsRoute } from "../app/api/reporting/metrics/route.ts";
 import { GET as getAuditRoute } from "../app/api/reporting/audit/route.ts";
 
 test("getDashboardMetrics y getAuditLogsReport calculan indicadores de negocio", async () => {
-  const prisma = new PrismaClient();
-  try {
-    const org = await prisma.organization.findFirst();
-    assert.ok(org);
+  const org = await prisma.organization.findFirst();
+  assert.ok(org);
 
-    const metrics = await getDashboardMetrics(org.id, prisma);
-    assert.ok(typeof metrics.totalCustomers === "number");
-    assert.ok(typeof metrics.activeConversations === "number");
-    assert.ok(typeof metrics.ordersTodayCount === "number");
-    assert.ok(typeof metrics.revenueToday === "number");
+  const metrics = await getDashboardMetrics(org.id, prisma);
+  assert.ok(typeof metrics.totalCustomers === "number");
+  assert.ok(typeof metrics.activeConversations === "number");
+  assert.ok(typeof metrics.ordersTodayCount === "number");
+  assert.ok(typeof metrics.revenueToday === "number");
 
-    const auditLogs = await getAuditLogsReport(org.id, 10, prisma);
-    assert.ok(Array.isArray(auditLogs));
-  } finally {
-    await prisma.$disconnect();
-  }
+  const auditLogs = await getAuditLogsReport(org.id, 10, prisma);
+  assert.ok(Array.isArray(auditLogs));
 });
 
 test("rutas API /api/reporting/metrics y /api/reporting/audit", async () => {
