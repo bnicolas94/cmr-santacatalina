@@ -1,0 +1,9 @@
+dist
+node_modules
+.vinext
+.wrangler
+prisma
+drizzle
+pnpm-lock.yaml
+package-lock.json
+
