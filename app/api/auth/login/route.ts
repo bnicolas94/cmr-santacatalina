@@ -40,13 +40,20 @@ export async function POST(request: Request) {
         },
       },
     );
-  } catch (error) {
-    if (error instanceof AuthError) {
+  } catch (error: unknown) {
+    const err = error as { name?: string; statusCode?: number; message?: string };
+    if (
+      error instanceof AuthError ||
+      err?.name === "AuthError" ||
+      typeof err?.statusCode === "number"
+    ) {
       return Response.json(
-        { error: error.message },
-        { status: error.statusCode },
+        { error: err.message || "Credenciales inválidas o usuario inactivo." },
+        { status: err.statusCode || 401 },
       );
     }
+
+    console.error("Error en POST /api/auth/login:", error);
     return Response.json(
       { error: "Error interno del servidor al procesar el inicio de sesión." },
       { status: 500 },
