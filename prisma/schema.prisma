@@ -22,6 +22,7 @@ model Organization {
   conversations Conversation[]
   categories    Category[]
   products      Product[]
+  orders        Order[]
 
   @@map("organizations")
 }
@@ -37,6 +38,7 @@ model Branch {
   updatedAt      DateTime     @updatedAt @map("updated_at")
 
   conversations Conversation[]
+  orders        Order[]
 
   @@index([organizationId])
   @@index([organizationId, active])
@@ -57,10 +59,12 @@ model User {
 
   userRoles             UserRole[]
   auditLogs             AuditLog[]
-  assignedConversations Conversation[] @relation("AssignedUser")
-  lockedConversations   Conversation[] @relation("LockUser")
+  assignedConversations Conversation[]   @relation("AssignedUser")
+  lockedConversations   Conversation[]   @relation("LockUser")
   sentMessages          Message[]
   internalNotes         InternalNote[]
+  createdOrders         Order[]
+  statusChanges         OrderStatusHistory[]
 
   @@index([organizationId])
   @@index([organizationId, active])
@@ -177,6 +181,7 @@ model Customer {
 
   addresses     CustomerAddress[]
   conversations Conversation[]
+  orders        Order[]
 
   @@unique([organizationId, whatsappNumber])
   @@index([organizationId])
@@ -200,6 +205,8 @@ model CustomerAddress {
   isDefault  Boolean  @default(false) @map("is_default")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
+
+  orders Order[]
 
   @@index([customerId])
   @@map("customer_addresses")
@@ -230,6 +237,7 @@ model Conversation {
 
   messages      Message[]
   internalNotes InternalNote[]
+  orders        Order[]
 
   @@index([organizationId])
   @@index([organizationId, status])
@@ -326,8 +334,79 @@ model Product {
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
 
+  orderItems OrderItem[]
+
   @@index([organizationId])
   @@index([organizationId, active])
   @@index([categoryId])
   @@map("products")
+}
+
+model Order {
+  id                String           @id @default(cuid())
+  organizationId    String           @map("organization_id")
+  organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId          String?          @map("branch_id")
+  branch            Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  customerId        String           @map("customer_id")
+  customer          Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  conversationId    String?          @map("conversation_id")
+  conversation      Conversation?    @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  orderNumber       String           @unique @map("order_number")
+  fulfillmentType   String           @map("fulfillment_type")
+  deliveryAddressId String?          @map("delivery_address_id")
+  deliveryAddress   CustomerAddress? @relation(fields: [deliveryAddressId], references: [id], onDelete: SetNull)
+  status            String           @default("BORRADOR")
+  subtotal          Decimal          @db.Decimal(12, 2)
+  deliveryFee       Decimal          @default(0) @db.Decimal(12, 2) @map("delivery_fee")
+  discount          Decimal          @default(0) @db.Decimal(12, 2)
+  total             Decimal          @db.Decimal(12, 2)
+  paymentMethod     String?          @map("payment_method")
+  paymentStatus     String           @default("PENDIENTE") @map("payment_status")
+  notes             String?
+  createdByUserId   String           @map("created_by_user_id")
+  createdByUser     User             @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  items         OrderItem[]
+  statusHistory OrderStatusHistory[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([customerId])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String   @id @default(cuid())
+  orderId     String   @map("order_id")
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String   @map("product_id")
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productName String   @map("product_name")
+  unitPrice   Decimal  @db.Decimal(12, 2) @map("unit_price")
+  quantity    Int
+  subtotal    Decimal  @db.Decimal(12, 2)
+  notes       String?
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id              String   @id @default(cuid())
+  orderId         String   @map("order_id")
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus      String?  @map("from_status")
+  toStatus        String   @map("to_status")
+  changedByUserId String   @map("changed_by_user_id")
+  changedByUser   User     @relation(fields: [changedByUserId], references: [id], onDelete: Cascade)
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([orderId])
+  @@map("order_status_history")
 }
