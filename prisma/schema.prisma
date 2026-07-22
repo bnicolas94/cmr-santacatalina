@@ -15,8 +15,9 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  branches Branch[]
-  users    User[]
+  branches  Branch[]
+  users     User[]
+  auditLogs AuditLog[]
 
   @@map("organizations")
 }
@@ -49,6 +50,7 @@ model User {
   updatedAt      DateTime     @updatedAt @map("updated_at")
 
   userRoles UserRole[]
+  auditLogs AuditLog[]
 
   @@index([organizationId])
   @@index([organizationId, active])
@@ -107,4 +109,26 @@ model RolePermission {
   @@index([roleId])
   @@index([permissionId])
   @@map("role_permissions")
+}
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actorUserId    String?      @map("actor_user_id")
+  actorUser      User?        @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  action         String
+  entityType     String       @map("entity_type")
+  entityId       String?      @map("entity_id")
+  before         Json?
+  after          Json?
+  ip             String?
+  userAgent      String?      @map("user_agent")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@index([organizationId])
+  @@index([organizationId, createdAt])
+  @@index([actorUserId])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
 }
