@@ -9,10 +9,7 @@ export async function GET(
 ) {
   const user = await getCurrentUser(request);
   if (!user) {
-    return Response.json(
-      { error: "No hay sesión activa." },
-      { status: 401 },
-    );
+    return Response.json({ error: "No hay sesión activa." }, { status: 401 });
   }
 
   const { id } = await params;

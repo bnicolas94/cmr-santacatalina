@@ -64,6 +64,7 @@ test("findOrCreateCustomer y addCustomerAddress gestionan clientes y direcciones
 test("processInboundWebhookMessage procesa mensajes entrantes y ventana de 24hs", async () => {
   const prisma = new PrismaClient();
   try {
+    const phoneNum = `54911${Date.now().toString().slice(-8)}`;
     const wamid = `wamid.INBOUND_${Date.now()}`;
     const payload = {
       object: "whatsapp_business_account",
@@ -77,13 +78,13 @@ test("processInboundWebhookMessage procesa mensajes entrantes y ventana de 24hs"
                 contacts: [
                   {
                     profile: { name: "Carlos Consulta" },
-                    wa_id: "5491188887777",
+                    wa_id: phoneNum,
                   },
                 ],
                 messages: [
                   {
                     id: wamid,
-                    from: "5491188887777",
+                    from: phoneNum,
                     timestamp: `${Math.floor(Date.now() / 1000)}`,
                     type: "text",
                     text: { body: "¿Tienen stock de muzzarella?" },
@@ -107,7 +108,7 @@ test("processInboundWebhookMessage procesa mensajes entrantes y ventana de 24hs"
     });
 
     assert.ok(conversation);
-    assert.equal(conversation.customer.whatsappNumber, "5491188887777");
+    assert.equal(conversation.customer.whatsappNumber, phoneNum);
     assert.equal(conversation.unreadCount, 1);
     assert.ok(conversation.serviceWindowExpiresAt);
     assert.ok(conversation.serviceWindowExpiresAt > new Date());

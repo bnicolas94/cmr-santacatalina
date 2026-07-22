@@ -59,7 +59,10 @@ export async function POST(
     return Response.json({ status: "ok", message }, { status: 201 });
   } catch (error) {
     return Response.json(
-      { error: error instanceof Error ? error.message : "Error enviando mensaje." },
+      {
+        error:
+          error instanceof Error ? error.message : "Error enviando mensaje.",
+      },
       { status: 400 },
     );
   }

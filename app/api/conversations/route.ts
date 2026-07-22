@@ -6,10 +6,7 @@ const prisma = new PrismaClient();
 export async function GET(request: Request) {
   const user = await getCurrentUser(request);
   if (!user) {
-    return Response.json(
-      { error: "No hay sesión activa." },
-      { status: 401 },
-    );
+    return Response.json({ error: "No hay sesión activa." }, { status: 401 });
   }
 
   const url = new URL(request.url);
